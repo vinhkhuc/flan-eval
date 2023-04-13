@@ -31,13 +31,22 @@ class SeqToSeqModel(EvalModel):
     tokenizer: Optional[PreTrainedTokenizer]
     device: str = "cuda"
     load_8bit: bool = False
+    use_peft: bool = False
 
     def load(self):
         if self.model is None:
             args = {}
             if self.load_8bit:
                 args.update(device_map="auto", load_in_8bit=True)
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_path, **args)
+
+            if self.use_peft:
+                from peft import PeftModel, PeftConfig
+                config = PeftConfig.from_pretrained(self.model_path, **args)
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(config.base_model_name_or_path)
+                self.model = PeftModel.from_pretrained(self.model, self.model_path)
+            else:
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(self.model_path, **args)
+
             self.model.eval()
             if not self.load_8bit:
                 self.model.to(self.device)
